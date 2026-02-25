@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin DCA vs Loan Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {}
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-orange-500 to-orange-600">
+    <div id="app" class="p-4 md:p-8">
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">
+                Bitcoin: DCA vs Loan Strategy
+            </h1>
+            <p class="text-white/80 text-sm md:text-base">
+                Compare lump-sum Bitcoin loans vs Dollar Cost Averaging historically
+            </p>
+        </div>
+
+        <!-- Controls -->
+        <div class="max-w-5xl mx-auto mb-6">
+            <div class="bg-white/95 backdrop-blur rounded-2xl p-4 md:p-6 shadow-xl">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Start Date</label>
+                        <select id="startDate" class="w-full px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">End Date</label>
+                        <select id="endDate" class="w-full px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Loan Term</label>
+                        <select id="loanTerm" class="w-full px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                            <option value="3">3 Months</option>
+                            <option value="6">6 Months</option>
+                            <option value="9">9 Months</option>
+                            <option value="12">1 Year</option>
+                            <option value="24">2 Years</option>
+                            <option value="36" selected>3 Years</option>
+                            <option value="48">4 Years</option>
+                            <option value="60">5 Years</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">APR (%)</label>
+                        <input type="number" id="apr" value="15" min="0" max="50" step="0.5" class="w-full px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Origination Fee (%)</label>
+                        <input type="number" id="originationFee" value="0" min="0" max="10" step="0.5" class="w-full px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Summary -->
+        <div class="max-w-5xl mx-auto mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white/95 backdrop-blur rounded-2xl p-4 text-center shadow-lg">
+                    <div id="loanWinPct" class="text-3xl font-bold text-green-500">--%</div>
+                    <div class="text-xs text-gray-500 mt-1">Loan Wins</div>
+                    <div id="loanWinCount" class="text-sm text-gray-700">-- periods</div>
+                </div>
+                <div class="bg-white/95 backdrop-blur rounded-2xl p-4 text-center shadow-lg">
+                    <div id="dcaWinPct" class="text-3xl font-bold text-red-400">--%</div>
+                    <div class="text-xs text-gray-500 mt-1">DCA Wins</div>
+                    <div id="dcaWinCount" class="text-sm text-gray-700">-- periods</div>
+                </div>
+                <div class="bg-white/95 backdrop-blur rounded-2xl p-4 text-center shadow-lg">
+                    <div id="avgAdvantage" class="text-3xl font-bold text-green-500">--%</div>
+                    <div class="text-xs text-gray-500 mt-1">Avg Loan Advantage</div>
+                </div>
+                <div class="bg-white/95 backdrop-blur rounded-2xl p-4 text-center shadow-lg">
+                    <div id="totalPeriods" class="text-3xl font-bold text-orange-500">--</div>
+                    <div class="text-xs text-gray-500 mt-1">Periods Analyzed</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liquidation Risk Box -->
+        <div class="max-w-5xl mx-auto mb-6">
+            <div class="bg-gradient-to-r from-red-500/90 to-red-600/90 backdrop-blur rounded-2xl p-5 shadow-xl text-white">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-2">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <h3 class="font-bold text-lg">Traditional Lending Liquidation Risk</h3>
+                        </div>
+                        <p class="text-white/90 text-sm leading-relaxed">
+                            With traditional crypto-backed loans, if Bitcoin's price drops <strong>50% or more</strong> from your entry price, 
+                            your collateral gets <strong>liquidated</strong> — meaning you lose your Bitcoin and still owe the remaining loan balance. 
+                            This analysis shows how often this would have happened historically.
+                        </p>
+                    </div>
+                    <div class="flex-shrink-0 text-center bg-white/20 rounded-xl p-4 min-w-[140px]">
+                        <div id="liquidationCount" class="text-4xl font-bold">--</div>
+                        <div class="text-sm text-white/90">Liquidations</div>
+                        <div id="liquidationPct" class="text-xs text-white/80 mt-1">-- of periods</div>
+                    </div>
+                </div>
+                <div class="mt-4 pt-4 border-t border-white/20">
+                    <p class="text-white/80 text-xs">
+                        💡 <strong>Why this matters:</strong> Even if the loan strategy wins mathematically, traditional lenders would have 
+                        liquidated your position during major crashes (2011, 2014, 2018, 2022), erasing all potential gains. 
+                        Protected lending products that use PUT options instead of liquidation solve this problem.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="max-w-5xl mx-auto">
+            <div class="bg-white/95 backdrop-blur rounded-2xl p-4 md:p-6 shadow-xl">
+                <div class="mb-4">
+                    <h2 id="chartTitle" class="text-lg font-semibold text-gray-800">
+                        Bitcoin: DCA vs Loan Strategy — 3 Years Term
+                    </h2>
+                    <p id="chartSubtitle" class="text-xs text-gray-500">
+                        30% Down Payment | 15% APR | 36-Month Amortization
+                    </p>
+                    <p class="text-xs text-orange-600 mt-1">Click on any bar to see detailed $10,000 comparison</p>
+                </div>
+                
+                <!-- Legend -->
+                <div class="flex flex-wrap gap-4 mb-4 text-sm">
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-green-400 rounded"></div>
+                        <span id="legendLoan" class="text-gray-700">LOAN Wins: -- periods (--%)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-red-400 rounded"></div>
+                        <span id="legendDca" class="text-gray-700">DCA Wins: -- periods (--%)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-4 h-4 bg-red-600 rounded"></div>
+                        <span class="text-gray-700">⚠️ Would have been liquidated</span>
+                    </div>
+                </div>
+                
+                <div class="relative h-80 md:h-96">
+                    <canvas id="priceChart"></canvas>
+                </div>
+                
+                <!-- Results box -->
+                <div class="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600 flex justify-end gap-8">
+                    <span><strong>RESULTS</strong></span>
+                    <span id="resultLoan">Loan: --%</span>
+                    <span id="resultDca">DCA: --%</span>
+                    <span id="resultAdv">Avg Adv: --%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detail Panel (shown on click) -->
+        <div id="detailPanel" class="max-w-5xl mx-auto mt-6 hidden">
+            <div class="bg-white/95 backdrop-blur rounded-2xl p-6 shadow-xl">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 id="detailTitle" class="text-lg font-semibold text-gray-800">Period Details</h3>
+                    <button onclick="closeDetailPanel()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                </div>
+                
+                <!-- Liquidation Warning (conditional) -->
+                <div id="liquidationWarning" class="hidden mb-4 p-4 bg-red-100 border-2 border-red-300 rounded-xl">
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">⚠️</span>
+                        <div>
+                            <h4 class="font-bold text-red-700">Liquidation Would Have Occurred!</h4>
+                            <p id="liquidationDetails" class="text-sm text-red-600 mt-1"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Loan Strategy -->
+                    <div class="bg-green-50 rounded-xl p-4 border-2 border-green-200">
+                        <h4 class="font-semibold text-green-700 mb-3 flex items-center gap-2">
+                            <span class="w-3 h-3 bg-green-500 rounded-full"></span>
+                            LOAN Strategy
+                        </h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Down Payment (30%):</span>
+                                <span id="loanDown" class="font-medium">$3,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Loan Amount (70%):</span>
+                                <span id="loanAmount" class="font-medium">$7,000</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Monthly Payment:</span>
+                                <span id="loanMonthly" class="font-medium">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Total Cash Out:</span>
+                                <span id="loanTotalCash" class="font-medium">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">BTC Price at Start:</span>
+                                <span id="loanStartPrice" class="font-medium">--</span>
+                            </div>
+                            <hr class="my-2 border-green-200">
+                            <div class="flex justify-between text-base">
+                                <span class="font-semibold text-green-700">BTC Accumulated:</span>
+                                <span id="loanBtc" class="font-bold text-green-700">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- DCA Strategy -->
+                    <div class="bg-red-50 rounded-xl p-4 border-2 border-red-200">
+                        <h4 class="font-semibold text-red-700 mb-3 flex items-center gap-2">
+                            <span class="w-3 h-3 bg-red-500 rounded-full"></span>
+                            DCA Strategy
+                        </h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Total Budget:</span>
+                                <span id="dcaTotalBudget" class="font-medium">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Monthly Investment:</span>
+                                <span id="dcaMonthly" class="font-medium">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Number of Buys:</span>
+                                <span id="dcaBuys" class="font-medium">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Avg BTC Price:</span>
+                                <span id="dcaAvgPrice" class="font-medium">--</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Price Range:</span>
+                                <span id="dcaPriceRange" class="font-medium">--</span>
+                            </div>
+                            <hr class="my-2 border-red-200">
+                            <div class="flex justify-between text-base">
+                                <span class="font-semibold text-red-700">BTC Accumulated:</span>
+                                <span id="dcaBtc" class="font-bold text-red-700">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Winner Banner -->
+                <div id="winnerBanner" class="mt-4 p-4 rounded-xl text-center">
+                    <span id="winnerText" class="text-lg font-bold"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer with Waitlist Link -->
+        <div class="text-center mt-8">
+            <p class="text-white/60 text-xs mb-4">Data: Bitcoin monthly prices 2010-2026 | Not financial advice</p>
+            <a href="https://bitmor.xyz/loans" target="_blank" 
+               class="inline-block px-8 py-3 bg-white text-orange-600 font-semibold rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200">
+                Join the Waitlist →
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Bitcoin Monthly Prices (2010-2026)
+        const BTC_PRICES = {
+            // 2010 (limited trading, Mt. Gox launched July 2010)
+            '2010-07': 0.05, '2010-08': 0.07, '2010-09': 0.06, '2010-10': 0.10,
+            '2010-11': 0.20, '2010-12': 0.30,
+            // 2011
+            '2011-01': 0.30, '2011-02': 1.00, '2011-03': 0.80, '2011-04': 1.10,
+            '2011-05': 8.00, '2011-06': 29.00, '2011-07': 14.00, '2011-08': 11.00,
+            '2011-09': 5.00, '2011-10': 3.20, '2011-11': 2.50, '2011-12': 4.70,
+            // 2012
+            '2012-01': 6.00, '2012-02': 4.50, '2012-03': 5.00, '2012-04': 5.00,
+            '2012-05': 5.10, '2012-06': 5.50, '2012-07': 7.50, '2012-08': 10.00,
+            '2012-09': 11.00, '2012-10': 11.50, '2012-11': 12.00, '2012-12': 13.50,
+            // 2013
+            '2013-01': 13.50, '2013-02': 22.00, '2013-03': 47.00, '2013-04': 135.00,
+            '2013-05': 120.00, '2013-06': 100.00, '2013-07': 68.00, '2013-08': 110.00,
+            '2013-09': 130.00, '2013-10': 140.00, '2013-11': 350.00, '2013-12': 750.00,
+            // 2014
+            '2014-01': 850.00, '2014-02': 700.00, '2014-03': 620.00, '2014-04': 500.00,
+            '2014-05': 450.00, '2014-06': 600.00, '2014-07': 580.00, '2014-08': 500.00,
+            '2014-09': 480.00, '2014-10': 380.00, '2014-11': 350.00, '2014-12': 320.00,
+            // 2015
+            '2015-01': 280.00, '2015-02': 220.00, '2015-03': 250.00, '2015-04': 240.00,
+            '2015-05': 230.00, '2015-06': 250.00, '2015-07': 280.00, '2015-08': 230.00,
+            '2015-09': 240.00, '2015-10': 270.00, '2015-11': 330.00, '2015-12': 430.00,
+            // 2016
+            '2016-01': 430, '2016-02': 380, '2016-03': 430, '2016-04': 420,
+            '2016-05': 450, '2016-06': 530, '2016-07': 680, '2016-08': 600,
+            '2016-09': 610, '2016-10': 615, '2016-11': 710, '2016-12': 770,
+            // 2017
+            '2017-01': 970, '2017-02': 970, '2017-03': 1190, '2017-04': 1080,
+            '2017-05': 1400, '2017-06': 2500, '2017-07': 2550, '2017-08': 2875,
+            '2017-09': 4700, '2017-10': 4400, '2017-11': 6400, '2017-12': 10800,
+            // 2018
+            '2018-01': 14000, '2018-02': 10200, '2018-03': 10800, '2018-04': 7000,
+            '2018-05': 9200, '2018-06': 7500, '2018-07': 6400, '2018-08': 7600,
+            '2018-09': 7050, '2018-10': 6600, '2018-11': 6350, '2018-12': 4000,
+            // 2019
+            '2019-01': 3750, '2019-02': 3450, '2019-03': 3850, '2019-04': 4100,
+            '2019-05': 5350, '2019-06': 8550, '2019-07': 10800, '2019-08': 10400,
+            '2019-09': 9600, '2019-10': 8300, '2019-11': 9200, '2019-12': 7200,
+            // 2020
+            '2020-01': 7200, '2020-02': 9400, '2020-03': 8600, '2020-04': 6800,
+            '2020-05': 8800, '2020-06': 9500, '2020-07': 9100, '2020-08': 11700,
+            '2020-09': 10800, '2020-10': 10800, '2020-11': 13700, '2020-12': 19000,
+            // 2021
+            '2021-01': 29300, '2021-02': 33100, '2021-03': 45100, '2021-04': 58800,
+            '2021-05': 57700, '2021-06': 35600, '2021-07': 33800, '2021-08': 39800,
+            '2021-09': 47100, '2021-10': 43800, '2021-11': 61300, '2021-12': 57000,
+            // 2022
+            '2022-01': 46300, '2022-02': 38500, '2022-03': 43100, '2022-04': 45500,
+            '2022-05': 38500, '2022-06': 31800, '2022-07': 19900, '2022-08': 23300,
+            '2022-09': 20000, '2022-10': 19400, '2022-11': 20500, '2022-12': 17000,
+            // 2023
+            '2023-01': 16600, '2023-02': 23100, '2023-03': 23500, '2023-04': 28400,
+            '2023-05': 29200, '2023-06': 27200, '2023-07': 30400, '2023-08': 29200,
+            '2023-09': 25900, '2023-10': 26900, '2023-11': 34700, '2023-12': 37700,
+            // 2024
+            '2024-01': 42500, '2024-02': 43000, '2024-03': 62400, '2024-04': 71000,
+            '2024-05': 63500, '2024-06': 67500, '2024-07': 63000, '2024-08': 64600,
+            '2024-09': 57300, '2024-10': 63400, '2024-11': 70000, '2024-12': 96400,
+            // 2025
+            '2025-01': 93500, '2025-02': 102000, '2025-03': 84000, '2025-04': 83000,
+            '2025-05': 95000, '2025-06': 107000, '2025-07': 103000, '2025-08': 98000,
+            '2025-09': 100000, '2025-10': 126000, '2025-11': 96000, '2025-12': 95000,
+            // 2026
+            '2026-01': 88000, '2026-02': 84000
+        };
+
+        const ALL_MONTHS = Object.keys(BTC_PRICES).sort();
+        const TERM_LABELS = {3: '3 Months', 6: '6 Months', 9: '9 Months', 12: '1 Year', 24: '2 Years', 36: '3 Years', 48: '4 Years', 60: '5 Years'};
+        const LIQUIDATION_THRESHOLD = 0.50; // 50% drop triggers liquidation
+        
+        let chart = null;
+        let currentResultsMap = {};
+        let currentAnalysisParams = {};
+
+        // Custom plugin to draw background colors
+        const backgroundPlugin = {
+            id: 'backgroundColors',
+            beforeDraw: (chart, args, options) => {
+                const { ctx, chartArea } = chart;
+                if (!chartArea || !options || !options.colors || options.colors.length === 0) return;
+                
+                const colors = options.colors;
+                const barWidth = chartArea.width / colors.length;
+                
+                ctx.save();
+                colors.forEach((color, i) => {
+                    if (color && color !== 'transparent') {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(
+                            chartArea.left + i * barWidth,
+                            chartArea.top,
+                            barWidth + 1,
+                            chartArea.bottom - chartArea.top
+                        );
+                    }
+                });
+                ctx.restore();
+            }
+        };
+        
+        Chart.register(backgroundPlugin);
+
+        function initDropdowns() {
+            const startSelect = document.getElementById('startDate');
+            const endSelect = document.getElementById('endDate');
+            
+            ALL_MONTHS.forEach(m => {
+                startSelect.innerHTML += `<option value="${m}">${m}</option>`;
+                endSelect.innerHTML += `<option value="${m}">${m}</option>`;
+            });
+            
+            // Default to 2016
+            startSelect.value = '2016-01';
+            endSelect.value = '2026-02';
+        }
+
+        function calculateMonthlyPayment(principal, annualRate, months) {
+            const monthlyRate = annualRate / 12;
+            if (monthlyRate === 0) return principal / months;
+            return principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
+        }
+
+        function checkLiquidation(startPrice, prices) {
+            const liquidationPrice = startPrice * (1 - LIQUIDATION_THRESHOLD);
+            for (let i = 0; i < prices.length; i++) {
+                if (prices[i] <= liquidationPrice) {
+                    return {
+                        liquidated: true,
+                        liquidationMonth: i,
+                        lowestPrice: Math.min(...prices),
+                        dropPercent: ((startPrice - Math.min(...prices)) / startPrice) * 100
+                    };
+                }
+            }
+            return {
+                liquidated: false,
+                lowestPrice: Math.min(...prices),
+                dropPercent: ((startPrice - Math.min(...prices)) / startPrice) * 100
+            };
+        }
+
+        function analyzePeriod(startMonth, loanMonths, apr, originationFee, investmentAmount = 10000) {
+            const startIdx = ALL_MONTHS.indexOf(startMonth);
+            if (startIdx === -1 || startIdx + loanMonths > ALL_MONTHS.length) return null;
+            
+            const months = ALL_MONTHS.slice(startIdx, startIdx + loanMonths);
+            const prices = months.map(m => BTC_PRICES[m]);
+            
+            const downPaymentPct = 0.30;
+            const downPayment = investmentAmount * downPaymentPct;
+            const loanAmount = investmentAmount * (1 - downPaymentPct);
+            const loanWithFees = loanAmount * (1 + originationFee / 100);
+            const monthlyPayment = calculateMonthlyPayment(loanWithFees, apr / 100, loanMonths);
+            const totalCashOutlay = downPayment + (monthlyPayment * loanMonths);
+            
+            const btcFromLoan = investmentAmount / prices[0];
+            const dcaMonthly = totalCashOutlay / loanMonths;
+            const btcFromDca = prices.reduce((sum, price) => sum + dcaMonthly / price, 0);
+            const avgDcaPrice = totalCashOutlay / btcFromDca;
+            
+            // Check for liquidation
+            const liquidationInfo = checkLiquidation(prices[0], prices);
+            
+            return {
+                startMonth,
+                endMonth: months[months.length - 1],
+                months,
+                prices,
+                loanWins: btcFromLoan > btcFromDca,
+                loanAdvantage: ((btcFromLoan / btcFromDca) - 1) * 100,
+                investmentAmount,
+                downPayment,
+                loanAmount,
+                loanWithFees,
+                monthlyPayment,
+                totalCashOutlay,
+                btcFromLoan,
+                btcFromDca,
+                startPrice: prices[0],
+                avgDcaPrice,
+                minPrice: Math.min(...prices),
+                maxPrice: Math.max(...prices),
+                // Liquidation data
+                ...liquidationInfo,
+                liquidationMonthName: liquidationInfo.liquidated ? months[liquidationInfo.liquidationMonth] : null
+            };
+        }
+
+        function runAnalysis() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const loanMonths = parseInt(document.getElementById('loanTerm').value);
+            const apr = parseFloat(document.getElementById('apr').value);
+            const originationFee = parseFloat(document.getElementById('originationFee').value);
+            
+            currentAnalysisParams = { startDate, endDate, loanMonths, apr, originationFee };
+            
+            const startIdx = ALL_MONTHS.indexOf(startDate);
+            const endIdx = ALL_MONTHS.indexOf(endDate);
+            
+            if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) return;
+            
+            const results = [];
+            currentResultsMap = {};
+            for (let i = startIdx; i <= endIdx - loanMonths + 1; i++) {
+                const result = analyzePeriod(ALL_MONTHS[i], loanMonths, apr, originationFee);
+                if (result) {
+                    results.push(result);
+                    currentResultsMap[result.startMonth] = result;
+                }
+            }
+            
+            const loanWins = results.filter(r => r.loanWins).length;
+            const dcaWins = results.length - loanWins;
+            const loanWinPct = results.length > 0 ? (loanWins / results.length) * 100 : 0;
+            const dcaWinPct = results.length > 0 ? (dcaWins / results.length) * 100 : 0;
+            const avgAdvantage = results.length > 0 ? results.reduce((sum, r) => sum + r.loanAdvantage, 0) / results.length : 0;
+            
+            // Calculate liquidations
+            const liquidations = results.filter(r => r.liquidated).length;
+            const liquidationPct = results.length > 0 ? (liquidations / results.length) * 100 : 0;
+            
+            document.getElementById('loanWinPct').textContent = loanWinPct.toFixed(1) + '%';
+            document.getElementById('loanWinCount').textContent = loanWins + ' periods';
+            document.getElementById('dcaWinPct').textContent = dcaWinPct.toFixed(1) + '%';
+            document.getElementById('dcaWinCount').textContent = dcaWins + ' periods';
+            document.getElementById('avgAdvantage').textContent = (avgAdvantage >= 0 ? '+' : '') + avgAdvantage.toFixed(1) + '%';
+            document.getElementById('avgAdvantage').className = 'text-3xl font-bold ' + (avgAdvantage >= 0 ? 'text-green-500' : 'text-red-400');
+            document.getElementById('totalPeriods').textContent = results.length;
+            
+            // Update liquidation display
+            document.getElementById('liquidationCount').textContent = liquidations;
+            document.getElementById('liquidationPct').textContent = liquidationPct.toFixed(1) + '% of periods';
+            
+            const termLabel = TERM_LABELS[loanMonths] || loanMonths + ' Months';
+            document.getElementById('chartTitle').textContent = `Bitcoin: DCA vs Loan Strategy — ${termLabel} Term`;
+            document.getElementById('chartSubtitle').textContent = `30% Down Payment | ${apr}% APR | ${originationFee > 0 ? originationFee + '% Origination Fee | ' : ''}${loanMonths}-Month Amortization`;
+            document.getElementById('legendLoan').textContent = `LOAN Wins: ${loanWins} periods (${loanWinPct.toFixed(1)}%)`;
+            document.getElementById('legendDca').textContent = `DCA Wins: ${dcaWins} periods (${dcaWinPct.toFixed(1)}%)`;
+            
+            document.getElementById('resultLoan').textContent = `Loan: ${loanWinPct.toFixed(1)}%`;
+            document.getElementById('resultDca').textContent = `DCA: ${dcaWinPct.toFixed(1)}%`;
+            document.getElementById('resultAdv').textContent = `Avg Adv: ${avgAdvantage >= 0 ? '+' : ''}${avgAdvantage.toFixed(1)}%`;
+            
+            closeDetailPanel();
+            updateChart(startIdx, endIdx, currentResultsMap);
+        }
+
+        function updateChart(startIdx, endIdx, resultsMap) {
+            const months = ALL_MONTHS.slice(startIdx, endIdx + 1);
+            const prices = months.map(m => BTC_PRICES[m]);
+            
+            // Calculate min/max for log scale (ensure min > 0 for log scale)
+            const minPrice = Math.max(0.01, Math.min(...prices) * 0.5);
+            const maxPrice = Math.max(...prices) * 1.5;
+            
+            // Create background colors array - darker red for liquidated periods
+            const backgroundColors = months.map(month => {
+                const result = resultsMap[month];
+                if (result) {
+                    if (result.liquidated) {
+                        return 'rgba(185, 28, 28, 0.6)'; // Dark red for liquidation
+                    }
+                    return result.loanWins ? 'rgba(74, 222, 128, 0.5)' : 'rgba(248, 113, 113, 0.5)';
+                }
+                return 'transparent';
+            });
+            
+            const canvas = document.getElementById('priceChart');
+            const ctx = canvas.getContext('2d', { willReadFrequently: false });
+            
+            if (chart) chart.destroy();
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'BTC Price',
+                        data: prices,
+                        borderColor: '#1f2937',
+                        borderWidth: 2.5,
+                        pointRadius: 0,
+                        tension: 0.1,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const month = months[index];
+                            showDetailPanel(month);
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        backgroundColors: {
+                            colors: backgroundColors
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(255,255,255,0.95)',
+                            titleColor: '#1f2937',
+                            bodyColor: '#1f2937',
+                            borderColor: '#e5e7eb',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    const month = context.label;
+                                    const result = currentResultsMap[month];
+                                    let lines = ['BTC: $' + context.raw.toLocaleString()];
+                                    if (result) {
+                                        if (result.liquidated) {
+                                            lines.push('⚠️ LIQUIDATION in this period!');
+                                        }
+                                        lines.push(result.loanWins ? '🟢 Loan wins' : '🔴 DCA wins');
+                                        lines.push('Click for detailed breakdown');
+                                    }
+                                    return lines;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 12,
+                                callback: function(value, index) {
+                                    const label = this.getLabelForValue(value);
+                                    return label ? label.substring(0, 4) : '';
+                                },
+                                color: '#6b7280'
+                            },
+                            grid: { display: false }
+                        },
+                        y: {
+                            type: 'logarithmic',
+                            min: minPrice,
+                            max: maxPrice,
+                            ticks: {
+                                callback: function(value) {
+                                    if (value >= 100000) return '$' + (value/1000) + 'K';
+                                    if (value >= 10000) return '$' + (value/1000) + 'K';
+                                    if (value >= 1000) return '$' + (value/1000) + 'K';
+                                    if (value >= 1) return '$' + value.toFixed(0);
+                                    return '$' + value.toFixed(2);
+                                },
+                                color: '#6b7280'
+                            },
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showDetailPanel(month) {
+            const result = currentResultsMap[month];
+            if (!result) {
+                closeDetailPanel();
+                return;
+            }
+            
+            const panel = document.getElementById('detailPanel');
+            panel.classList.remove('hidden');
+            
+            const termLabel = TERM_LABELS[currentAnalysisParams.loanMonths] || currentAnalysisParams.loanMonths + ' Months';
+            document.getElementById('detailTitle').textContent = `$10,000 Investment: ${month} to ${result.endMonth} (${termLabel})`;
+            
+            // Show/hide liquidation warning
+            const liquidationWarning = document.getElementById('liquidationWarning');
+            if (result.liquidated) {
+                liquidationWarning.classList.remove('hidden');
+                document.getElementById('liquidationDetails').textContent = 
+                    `Bitcoin dropped ${result.dropPercent.toFixed(1)}% from $${result.startPrice.toLocaleString()} to $${result.lowestPrice.toLocaleString()} during this period. ` +
+                    `With traditional lending, your collateral would have been liquidated in ${result.liquidationMonthName}, ` +
+                    `and you would have lost all your Bitcoin while still owing the remaining loan balance.`;
+            } else {
+                liquidationWarning.classList.add('hidden');
+            }
+            
+            document.getElementById('loanDown').textContent = '$' + result.downPayment.toLocaleString();
+            document.getElementById('loanAmount').textContent = '$' + result.loanAmount.toLocaleString();
+            document.getElementById('loanMonthly').textContent = '$' + result.monthlyPayment.toFixed(2);
+            document.getElementById('loanTotalCash').textContent = '$' + result.totalCashOutlay.toFixed(2);
+            document.getElementById('loanStartPrice').textContent = '$' + result.startPrice.toLocaleString();
+            document.getElementById('loanBtc').textContent = result.btcFromLoan.toFixed(6) + ' BTC';
+            
+            document.getElementById('dcaTotalBudget').textContent = '$' + result.totalCashOutlay.toFixed(2);
+            document.getElementById('dcaMonthly').textContent = '$' + (result.totalCashOutlay / result.months.length).toFixed(2);
+            document.getElementById('dcaBuys').textContent = result.months.length + ' purchases';
+            document.getElementById('dcaAvgPrice').textContent = '$' + result.avgDcaPrice.toLocaleString(undefined, {maximumFractionDigits: 2});
+            document.getElementById('dcaPriceRange').textContent = '$' + result.minPrice.toLocaleString() + ' - $' + result.maxPrice.toLocaleString();
+            document.getElementById('dcaBtc').textContent = result.btcFromDca.toFixed(6) + ' BTC';
+            
+            const banner = document.getElementById('winnerBanner');
+            const winnerText = document.getElementById('winnerText');
+            const diff = ((result.btcFromLoan / result.btcFromDca) - 1) * 100;
+            
+            if (result.liquidated) {
+                banner.className = 'mt-4 p-4 rounded-xl text-center bg-red-100 border-2 border-red-300';
+                winnerText.className = 'text-lg font-bold text-red-700';
+                winnerText.textContent = `⚠️ With traditional lending: LIQUIDATED — Lost all Bitcoin + still owed debt`;
+            } else if (result.loanWins) {
+                banner.className = 'mt-4 p-4 rounded-xl text-center bg-green-100 border-2 border-green-300';
+                winnerText.className = 'text-lg font-bold text-green-700';
+                winnerText.textContent = `🏆 LOAN WINS by ${diff.toFixed(1)}% (+${(result.btcFromLoan - result.btcFromDca).toFixed(6)} BTC)`;
+            } else {
+                banner.className = 'mt-4 p-4 rounded-xl text-center bg-red-100 border-2 border-red-300';
+                winnerText.className = 'text-lg font-bold text-red-700';
+                winnerText.textContent = `🏆 DCA WINS by ${Math.abs(diff).toFixed(1)}% (+${(result.btcFromDca - result.btcFromLoan).toFixed(6)} BTC)`;
+            }
+            
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function closeDetailPanel() {
+            document.getElementById('detailPanel').classList.add('hidden');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initDropdowns();
+            runAnalysis();
+            
+            ['startDate', 'endDate', 'loanTerm', 'apr', 'originationFee'].forEach(id => {
+                document.getElementById(id).addEventListener('change', runAnalysis);
+                document.getElementById(id).addEventListener('input', runAnalysis);
+            });
+        });
+    </script>
+</body>
+</html>

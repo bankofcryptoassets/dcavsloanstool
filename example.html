@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTC Analyzer - Example Usage</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        pre {
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        .result {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #f97316; }
+        h2 { color: #333; margin-top: 30px; }
+        .win { color: #22c55e; font-weight: bold; }
+        .lose { color: #ef4444; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>BTC Loan Analyzer - Module Usage Example</h1>
+    
+    <p>This page demonstrates how to use the analyzer modules programmatically.</p>
+    
+    <h2>Example: Analyze a Specific Period</h2>
+    <div id="singleResult" class="result">Loading...</div>
+    
+    <h2>Example: Full Analysis Summary</h2>
+    <div id="fullResult" class="result">Loading...</div>
+    
+    <h2>Code Example</h2>
+    <pre><code>import { analyzePeriod, runFullAnalysis } from './src/analyzer.js';
+import { BTC_PRICES, ALL_MONTHS } from './src/data.js';
+
+// Analyze a single period
+const result = analyzePeriod('2020-01', 36, 15, 0);
+console.log(`Loan wins: ${result.loanWins}`);
+console.log(`BTC from Loan: ${result.btcFromLoan.toFixed(6)}`);
+console.log(`BTC from DCA: ${result.btcFromDca.toFixed(6)}`);
+
+// Run full analysis
+const analysis = runFullAnalysis('2016-01', '2026-02', 36, 15, 0);
+console.log(`Loan win rate: ${analysis.summary.loanWinPct.toFixed(1)}%`);
+console.log(`Liquidation rate: ${analysis.summary.liquidationPct.toFixed(1)}%`);</code></pre>
+
+    <script type="module">
+        import { analyzePeriod, runFullAnalysis, formatBTC, formatPercent, formatCurrency } from './src/analyzer.js';
+        
+        // Single period analysis
+        const period = analyzePeriod('2020-01', 36, 15, 0);
+        
+        document.getElementById('singleResult').innerHTML = `
+            <h3>Period: ${period.startMonth} to ${period.endMonth} (3 Year Loan)</h3>
+            <p><strong>BTC Price at Start:</strong> ${formatCurrency(period.startPrice)}</p>
+            <p><strong>Loan Strategy BTC:</strong> ${formatBTC(period.btcFromLoan)}</p>
+            <p><strong>DCA Strategy BTC:</strong> ${formatBTC(period.btcFromDca)}</p>
+            <p><strong>Winner:</strong> <span class="${period.loanWins ? 'win' : 'lose'}">${period.loanWins ? 'LOAN' : 'DCA'}</span> by ${formatPercent(Math.abs(period.loanAdvantage))}</p>
+            <p><strong>Would have been liquidated:</strong> ${period.liquidated ? '<span class="lose">YES</span>' : '<span class="win">NO</span>'}</p>
+        `;
+        
+        // Full analysis
+        const analysis = runFullAnalysis('2016-01', '2026-02', 36, 15, 0);
+        const s = analysis.summary;
+        
+        document.getElementById('fullResult').innerHTML = `
+            <h3>Full Analysis: 2016-01 to 2026-02 (3 Year Terms, 15% APR)</h3>
+            <p><strong>Total Periods Analyzed:</strong> ${s.total}</p>
+            <p><strong>Loan Wins:</strong> <span class="win">${s.loanWins} (${formatPercent(s.loanWinPct)})</span></p>
+            <p><strong>DCA Wins:</strong> <span class="lose">${s.dcaWins} (${formatPercent(s.dcaWinPct)})</span></p>
+            <p><strong>Average Loan Advantage:</strong> ${formatPercent(s.avgAdvantage, true)}</p>
+            <p><strong>Liquidations (50% drop):</strong> <span class="lose">${s.liquidations} (${formatPercent(s.liquidationPct)})</span></p>
+            <p><strong>Best Loan Advantage:</strong> ${formatPercent(s.maxLoanAdvantage, true)}</p>
+            <p><strong>Worst Loan Advantage:</strong> ${formatPercent(s.minLoanAdvantage, true)}</p>
+        `;
+    </script>
+</body>
+</html>

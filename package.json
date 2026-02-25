@@ -1,0 +1,33 @@
+{
+  "name": "btc-loan-analyzer",
+  "version": "1.0.0",
+  "description": "Interactive tool to compare Bitcoin lump-sum loan purchases vs Dollar Cost Averaging using historical data",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "serve": "npx serve .",
+    "start": "npx serve ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bitmor-protocol/btc-loan-analyzer.git"
+  },
+  "keywords": [
+    "bitcoin",
+    "btc",
+    "dca",
+    "dollar-cost-averaging",
+    "loan",
+    "cryptocurrency",
+    "investment",
+    "analysis",
+    "historical-data",
+    "finance"
+  ],
+  "author": "Bitmor Protocol",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bitmor-protocol/btc-loan-analyzer/issues"
+  },
+  "homepage": "https://bitmor.xyz/loans"
+}
